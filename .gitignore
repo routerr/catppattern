@@ -1,0 +1,36 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+# Windows pyc write-temp litter (e.g. catpattern.cpython-312.pyc.1234567)
+*.pyc.*
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Generated output (per AGENTS.md, patterns are written to results/) ---
+results/
+
+# --- Runtime files: logs, PID files, proxy integration state ---
+*.log
+*.pid
+integration-state.json
+
+# --- Machine-specific tool / agent state (not pattern-gen source) ---
+.agents/
+.codex/
+.crush/
+.roxy/
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors / IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
