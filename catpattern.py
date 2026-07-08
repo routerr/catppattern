@@ -203,7 +203,8 @@ def _draw_family(ax, x_petal, y_petal, sym_N, lw, alpha, accent1, accent2):
         color = lerp_color(accent1, accent2, t_c)
 
         ax.plot(x_rot, y_rot, color=color, alpha=alpha,
-                linewidth=lw, solid_capstyle="round", solid_joinstyle="round")
+                linewidth=lw, solid_capstyle="round", solid_joinstyle="round",
+                antialiased=(lw >= 0.8))
 
 
 def _draw_pupil(ax, accent1, accent2, pupil_r, scale_factor=1.0):
@@ -212,7 +213,7 @@ def _draw_pupil(ax, accent1, accent2, pupil_r, scale_factor=1.0):
     ax.add_patch(plt.Circle((0, 0), pupil_r, color=MOCHA["crust"], zorder=20))
     ax.add_patch(plt.Circle((0, 0), pupil_r, fill=False,
                             edgecolor=mid_color, linewidth=1.1 * scale_factor,
-                            alpha=0.55, zorder=21))
+                            alpha=0.55, zorder=21, antialiased=(1.1 * scale_factor >= 0.8)))
 
 
 def build_families(rng, semi_major, lw_scale):
@@ -592,7 +593,8 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         
         # Create a LineCollection with these segment colors and properties
         lc = LineCollection([], colors=rgba_colors, linewidths=fam["lw"] * scale_factor,
-                            capstyle="round", joinstyle="round")
+                            capstyle="round", joinstyle="round",
+                            antialiaseds=(fam["lw"] * scale_factor >= 0.8))
         ax.add_collection(lc)
         line_collections.append(lc)
 
@@ -601,7 +603,8 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     pupil_circle = plt.Circle((0, 0), p["pupil_r"], color=MOCHA["crust"], zorder=20)
     pupil_outline = plt.Circle((0, 0), p["pupil_r"], fill=False,
                                 edgecolor=mid_color, linewidth=1.1 * scale_factor,
-                                alpha=0.55, zorder=21)
+                                alpha=0.55, zorder=21,
+                                antialiased=(1.1 * scale_factor >= 0.8))
     ax.add_patch(pupil_circle)
     ax.add_patch(pupil_outline)
 
