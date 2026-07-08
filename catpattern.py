@@ -210,7 +210,7 @@ def _draw_pupil(ax, accent1, accent2, pupil_r):
     mid_color = lerp_color(accent1, accent2, 0.5)
     ax.add_patch(plt.Circle((0, 0), pupil_r, color=MOCHA["crust"], zorder=20))
     ax.add_patch(plt.Circle((0, 0), pupil_r, fill=False,
-                            edgecolor=mid_color, linewidth=0.6,
+                            edgecolor=mid_color, linewidth=1.1,
                             alpha=0.55, zorder=21))
 
 
@@ -228,7 +228,7 @@ def build_families(rng, semi_major, lw_scale):
         # thinner when dense. Overall bump is small to keep patterns light.
         density = (0.7 * (sym_N - 14) / 32.0 +
                    0.3 * (num_families - 2) / 2.0)      # 0 sparse ... 1 dense
-        lw    = rng.uniform(1.4, 2.4) * (1.0 - 0.15 * density) * lw_scale
+        lw    = rng.uniform(1.4, 2.4) * (1.0 - 0.15 * density) * lw_scale * 1.8
         alpha = rng.uniform(0.28, 0.55)
         x_p, y_p, p1, p2 = random_petal(R_fam, rng)
         families.append(dict(x=x_p, y=y_p, N=sym_N, lw=lw, alpha=alpha,
@@ -594,7 +594,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     mid_color = lerp_color(p["accent1"], p["accent2"], 0.5)
     pupil_circle = plt.Circle((0, 0), p["pupil_r"], color=MOCHA["crust"], zorder=20)
     pupil_outline = plt.Circle((0, 0), p["pupil_r"], fill=False,
-                                edgecolor=mid_color, linewidth=0.6,
+                                edgecolor=mid_color, linewidth=1.1,
                                 alpha=0.55, zorder=21)
     ax.add_patch(pupil_circle)
     ax.add_patch(pupil_outline)
