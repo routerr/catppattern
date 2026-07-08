@@ -519,6 +519,42 @@ def _petal_from_controls_arr(p1, p2, R, n=320):
     return x_full, y_full
 
 
+def _stream_save_gif(out, first_p, frame_iterable):
+    """Write GIF frames directly to a file stream one-by-one to prevent Pillow's
+    default behavior of accumulating all normalized frame copies in memory."""
+    from PIL import GifImagePlugin
+    with open(out, "wb") as fp:
+        info = {
+            "loop": 0,
+            "duration": first_p.info.get("duration", 100),
+            "disposal": 1,
+            "optimize": True,
+        }
+        first_p.encoderinfo = info
+        first_normalized = GifImagePlugin._normalize_palette(first_p, None, info)
+        
+        # Write global header using the first frame
+        for block in GifImagePlugin._get_global_header(first_normalized, info):
+            fp.write(block)
+            
+        # Write the base/first frame
+        GifImagePlugin._write_frame_data(fp, first_normalized, (0, 0), info)
+        
+        # Sequentially write each frame and discard it immediately
+        for im in frame_iterable:
+            frame_info = {
+                "duration": im.info.get("duration", 100),
+                "disposal": 1,
+                "optimize": True,
+            }
+            im.encoderinfo = frame_info
+            p_im = GifImagePlugin._normalize_palette(im, None, frame_info)
+            GifImagePlugin._write_frame_data(fp, p_im, (0, 0), frame_info)
+            
+        # Write closing block
+        fp.write(b";")
+
+
 def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
                  fps=DEFAULT_GIF_FPS, size=None,
                  n_petal=None, horizontal=False):
@@ -732,14 +768,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     out = os.path.join(RESULTS_DIR, f"catpattern_{seed}{suffix}.gif")
 
     # Save the frames as an optimized GIF directly using PIL via streaming
-    first_p.save(
-        out,
-        save_all=True,
-        append_images=frame_generator(),
-        loop=0,
-        optimize=True,
-        disposal=1
-    )
+    _stream_save_gif(out, first_p, frame_generator())
     plt.close(fig)
     print(f"Saved: {out}")
     return out
