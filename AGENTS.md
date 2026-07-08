@@ -60,10 +60,12 @@ convention.
    rotational symmetry).
 5. Draw a central "pupil" disc in `crust` with a thin mid-colour outline.
 6. Save the figure (fixed size 3840×2160 @ 100 dpi, landscape) and close it. The GIF
-   path instead saves a 16:9 4K (default 3840×2160) animation via raw PIL
-   streaming frame assembly (yielding frames on the fly to minimize memory usage,
-   bounded concurrency, and on-the-fly deduplication), rebuilding every petal from its
-   (envelope-gated) morphed control points per frame.
+   path instead saves a 16:9 4K (default 3840×2160) animation. To achieve flat-line memory
+   usage (~200 MB flat instead of 11+ GB overhead), the generator uses a custom streaming
+   writer (`_stream_save_gif`) that bypasses Pillow's default behavior of accumulating all
+   normalized frame copies in a list. It leases pre-allocated NumPy array buffers to hold
+   the raw RGBA canvas arrays without copying, converts them to P-mode, writes them directly
+   to the file descriptor on the fly, and triggers periodic garbage collection (`gc.collect()`).
 
 ### Key invariants when modifying
 
@@ -84,6 +86,7 @@ convention.
   never breaks whole-pattern rotational symmetry.
 - Linewidths are scaled dynamically by `H / 2160.0` at render time, preserving relative stroke thickness on custom resolution canvas runs.
 - Cubic Bezier evaluation uses a cosine-spaced parameter distribution `t = 0.5 * (1.0 - cos(pi * linear_t))` to cluster points near the origin and tip where curvature is highest, permitting lower step counts with no fidelity loss.
+- **Dynamic Anti-Aliasing**: If a scaled line width drops below `0.8` points, anti-aliasing is automatically disabled to snap thin strokes directly to pixel coordinates, preserving crisp shapes at very small canvas resolutions.
 
 ## Palette
 
@@ -133,4 +136,8 @@ against a reference image — none exists yet.
   Windows (mvdan/sh PATH quirks); it probes `python`/`python3`/`py` for one with
   numpy+matplotlib+Pillow and uses its absolute path. If it still fails, run `sh generate.sh`
   rather than `./generate.sh`.
-- The project is not a git repo and has no CI, lint, or formatter config.
+- The repository is version-controlled via Git and the Python code is formatted using **Ruff**. Format changes can be applied with:
+  ```bash
+  pip install ruff
+  ruff format catpattern.py
+  ```
