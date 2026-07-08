@@ -139,8 +139,9 @@ def lerp_color_arr(c1_hex, c2_hex, t):
 
 
 def cubic_bezier(p0, p1, p2, p3, n=320):
-    """Evaluate a cubic Bezier curve at n evenly-spaced parameter values."""
-    t = np.linspace(0, 1, n)
+    """Evaluate a cubic Bezier curve at n points clustered at the endpoints."""
+    linear_t = np.linspace(0, 1, n)
+    t = 0.5 * (1.0 - np.cos(np.pi * linear_t))
     x = ((1-t)**3*p0[0] + 3*(1-t)**2*t*p1[0] +
          3*(1-t)*t**2*p2[0] + t**3*p3[0])
     y = ((1-t)**3*p0[1] + 3*(1-t)**2*t*p1[1] +
@@ -205,12 +206,12 @@ def _draw_family(ax, x_petal, y_petal, sym_N, lw, alpha, accent1, accent2):
                 linewidth=lw, solid_capstyle="round", solid_joinstyle="round")
 
 
-def _draw_pupil(ax, accent1, accent2, pupil_r):
+def _draw_pupil(ax, accent1, accent2, pupil_r, scale_factor=1.0):
     """Central pupil disc in crust with a thin mid-colour outline."""
     mid_color = lerp_color(accent1, accent2, 0.5)
     ax.add_patch(plt.Circle((0, 0), pupil_r, color=MOCHA["crust"], zorder=20))
     ax.add_patch(plt.Circle((0, 0), pupil_r, fill=False,
-                            edgecolor=mid_color, linewidth=1.1,
+                            edgecolor=mid_color, linewidth=1.1 * scale_factor,
                             alpha=0.55, zorder=21))
 
 
@@ -323,10 +324,11 @@ def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
     ax.set_ylim(-half_h, half_h)
 
     # -- Draw ---------------------------------------------------------------------
+    scale_factor = H / 2160.0
     for fam in p["families"]:
-        _draw_family(ax, fam["x"], fam["y"], fam["N"], fam["lw"],
+        _draw_family(ax, fam["x"], fam["y"], fam["N"], fam["lw"] * scale_factor,
                      fam["alpha"], p["accent1"], p["accent2"])
-    _draw_pupil(ax, p["accent1"], p["accent2"], p["pupil_r"])
+    _draw_pupil(ax, p["accent1"], p["accent2"], p["pupil_r"], scale_factor)
 
     # -- Save ---------------------------------------------------------------------
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
@@ -488,7 +490,8 @@ def _cubic_bezier_arr(p0, p1, p2, p3, n=320):
     p1, p2, p3 have shape [frames, 2].
     Returns x, y of shape [frames, n].
     """
-    t = np.linspace(0, 1, n)[np.newaxis, :]  # shape [1, n]
+    linear_t = np.linspace(0, 1, n)
+    t = (0.5 * (1.0 - np.cos(np.pi * linear_t)))[np.newaxis, :]  # shape [1, n]
     
     p1_x, p1_y = p1[:, 0:1], p1[:, 1:2]  # shape [frames, 1]
     p2_x, p2_y = p2[:, 0:1], p2[:, 1:2]
@@ -560,10 +563,10 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     ax.set_ylim(-half_h, half_h)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-    # Dynamic Bezier step scaling based on target canvas resolution
+    # Dynamic Bezier step scaling based on target canvas resolution (using 80 points standard due to cosine spacing)
     if n_petal is None:
         canvas_edge = max(W, H)
-        n_petal = max(60, min(320, int(canvas_edge * 120 / 720)))
+        n_petal = max(40, min(240, int(canvas_edge * 80 / 720)))
 
     # Exact-count forward loop. The phase advances from 0 to 1 once; both ends
     # render the base shape, and every intermediate frame advances forward.
@@ -571,6 +574,9 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     schedule_arr = np.array(schedule, dtype=np.float32)
 
     from matplotlib.collections import LineCollection
+
+    # Resolution-aware linewidth scaling
+    scale_factor = H / 2160.0
 
     # Pre-create all line collections
     line_collections = []
@@ -585,7 +591,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         rgba_colors = np.concatenate([rgb_colors, alphas], axis=1)
         
         # Create a LineCollection with these segment colors and properties
-        lc = LineCollection([], colors=rgba_colors, linewidths=fam["lw"],
+        lc = LineCollection([], colors=rgba_colors, linewidths=fam["lw"] * scale_factor,
                             capstyle="round", joinstyle="round")
         ax.add_collection(lc)
         line_collections.append(lc)
@@ -594,7 +600,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     mid_color = lerp_color(p["accent1"], p["accent2"], 0.5)
     pupil_circle = plt.Circle((0, 0), p["pupil_r"], color=MOCHA["crust"], zorder=20)
     pupil_outline = plt.Circle((0, 0), p["pupil_r"], fill=False,
-                                edgecolor=mid_color, linewidth=1.1,
+                                edgecolor=mid_color, linewidth=1.1 * scale_factor,
                                 alpha=0.55, zorder=21)
     ax.add_patch(pupil_circle)
     ax.add_patch(pupil_outline)

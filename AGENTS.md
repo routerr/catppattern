@@ -53,7 +53,7 @@ convention.
 1. Seed → `random.Random` instance.
 2. Pick 2 accent colours via `pick_distinct_accents(rng)` (hue-constrained — see Palette).
 3. Build 2–4 "families": each family = one random bilateral-symmetric petal shape
-   (built by `random_petal` -> `petal_from_controls` via `cubic_bezier`) + a rotational symmetry order `N`.
+   (built by `random_petal` -> `petal_from_controls` via `cubic_bezier` using cosine-spaced parameter evaluation) + a rotational symmetry order `N`.
 4. Render: each family's petal is plotted `N` times at equal angles `2π/n`.
    Colour is a cosine-cycle blend (`t = ½(1 − cos(2π·k/N))`) of the two accents, so the
    gradient wraps seamlessly (copy 0 and copy N share a colour → no seam, true
@@ -82,6 +82,8 @@ convention.
   the first exactly, and the GIF loops seamlessly. Bilateral petal symmetry is
   rebuilt every frame by `petal_from_controls` (mirror `y -> -y`), so the morph
   never breaks whole-pattern rotational symmetry.
+- Linewidths are scaled dynamically by `H / 2160.0` at render time, preserving relative stroke thickness on custom resolution canvas runs.
+- Cubic Bezier evaluation uses a cosine-spaced parameter distribution `t = 0.5 * (1.0 - cos(pi * linear_t))` to cluster points near the origin and tip where curvature is highest, permitting lower step counts with no fidelity loss.
 
 ## Palette
 
