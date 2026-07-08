@@ -688,33 +688,49 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     first_p = _optimize_frame(first_img)
     first_p.info['duration'] = delays_ms[0]
 
-    # Bounded concurrency frame streaming generator with on-the-fly deduplication
+    # Bounded concurrency frame streaming generator with on-the-fly deduplication and buffer pool
     def frame_generator():
         from concurrent.futures import ThreadPoolExecutor
         import os
+        import gc
         from PIL import ImageChops
         
         cpu_count = os.cpu_count() or 4
         max_workers = min(cpu_count, 8)
         active_limit = 2 * max_workers
         
-        def draw_frame(fi):
+        # Pre-allocate buffer pool (NumPy arrays) to avoid allocation overhead
+        buffer_pool = [np.empty((h_fig, w_fig, 4), dtype=np.uint8) for _ in range(active_limit + 2)]
+        
+        def draw_frame(fi, buf):
             for fam_idx, lc in enumerate(line_collections):
                 coords = precomputed_data[fam_idx]["coords"]
                 lc.set_segments(coords[fi])
             fig.canvas.draw()
             rgba_buffer = fig.canvas.buffer_rgba()
-            return Image.frombuffer("RGBA", (w_fig, h_fig), rgba_buffer, "raw", "RGBA", 0, 1).copy()
+            
+            # Copy memoryview data directly into our leased buffer array
+            src = np.frombuffer(rgba_buffer, dtype=np.uint8).reshape(h_fig, w_fig, 4)
+            np.copyto(buf, src)
+            
+            # Wrap buffer without making a copy
+            return Image.frombuffer("RGBA", (w_fig, h_fig), buf, "raw", "RGBA", 0, 1)
 
         futures = {}
         next_submit = 1
         next_yield = 1
         
+        def optimize_frame(img, buf):
+            p_im = img.convert("RGB").convert("P", dither=Image.Dither.NONE)
+            return p_im, buf
+
         def submit_next():
             nonlocal next_submit
             if next_submit < len(schedule):
-                img = draw_frame(next_submit)
-                fut = executor.submit(_optimize_frame, img)
+                # Lease buffer from pool (should always have one available due to active_limit size)
+                buf = buffer_pool.pop() if buffer_pool else np.empty((h_fig, w_fig, 4), dtype=np.uint8)
+                img = draw_frame(next_submit, buf)
+                fut = executor.submit(optimize_frame, img, buf)
                 futures[next_submit] = fut
                 next_submit += 1
 
@@ -732,9 +748,15 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
                     submit_next()
                     
                     fut = futures.pop(next_yield)
-                    curr_frame = fut.result()
+                    curr_frame, buf = fut.result()
+                    buffer_pool.append(buf) # return buffer to pool
+                    
                     curr_delay = delays_ms[next_yield]
                     next_yield += 1
+                    
+                    # Periodic explicit garbage collection
+                    if next_yield % 100 == 0:
+                        gc.collect()
                     
                     if buffered_frame is None:
                         buffered_frame = curr_frame
