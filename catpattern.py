@@ -26,9 +26,9 @@ Modes:
 Size flags (-s/-xs/-xxs/-xxxs) shrink the pattern and apply to both modes.
 -h/--horizontal renders a 2532x1170 landscape iPhone wallpaper canvas. For GIFs,
 --gif-size becomes the horizontal long edge when this flag is used.
-GIF-only tunables: --frames (exact count, default 1500 = 15s * 100fps),
-                   --fps (default 100), --gif-size (square edge in px,
-                   default 720; horizontal default 2532).
+GIF-only tunables: --frames (exact count, default 1400 = 15s * 93fps),
+                   --fps (default 93), --gif-size (width in px, maintaining
+                   16:9 ratio, default 3840; horizontal default 2532).
 """
 
 import colorsys
@@ -42,14 +42,17 @@ import time
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(SCRIPT_PATH, "results")
-MOTION_SCALE = 1.8
+MOTION_SCALE = 1.5
+DEFAULT_GIF_FPS = 93
+DEFAULT_GIF_SECONDS = 15
+DEFAULT_GIF_FRAMES = 1400
 PNG_SIZE = (3840, 2160)
-DEFAULT_GIF_SIZE = 720
+DEFAULT_GIF_SIZE = 3840
 HORIZONTAL_WALLPAPER_SIZE = (2532, 1170)
 
 
 MOCHA = {
-    "base":      "#1e1e2e",
+    "base":      "#11111b",
     "mantle":    "#181825",
     "crust":     "#11111b",
     "surface0":  "#313244",
@@ -126,6 +129,13 @@ def lerp_color(c1_hex, c2_hex, t):
     c1 = hex_to_rgb(c1_hex)
     c2 = hex_to_rgb(c2_hex)
     return tuple(a + (b - a) * t for a, b in zip(c1, c2))
+
+
+def lerp_color_arr(c1_hex, c2_hex, t):
+    """Vectorized linear interpolation between two hex colors for an array of t values in [0, 1]."""
+    c1 = np.array(hex_to_rgb(c1_hex), dtype=np.float32)
+    c2 = np.array(hex_to_rgb(c2_hex), dtype=np.float32)
+    return c1[np.newaxis, :] + (c2 - c1)[np.newaxis, :] * t[:, np.newaxis]
 
 
 def cubic_bezier(p0, p1, p2, p3, n=320):
@@ -288,8 +298,11 @@ def _gif_canvas_size(horizontal, size):
         ratio = HORIZONTAL_WALLPAPER_SIZE[1] / HORIZONTAL_WALLPAPER_SIZE[0]
         return width, max(1, int(round(width * ratio)))
 
-    edge = DEFAULT_GIF_SIZE if size is None else int(size)
-    return edge, edge
+    if size is None:
+        return PNG_SIZE
+    width = int(size)
+    ratio = PNG_SIZE[1] / PNG_SIZE[0]
+    return width, max(1, int(round(width * ratio)))
 
 
 def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
@@ -344,7 +357,7 @@ def _morph_components(families, morph_rng):
             for _axis in (0, 1):  # x, y
                 ncomp  = morph_rng.randint(2, 3)
                 amps   = [morph_rng.uniform(0.04, 0.11) * R for _ in range(ncomp)]
-                freqs  = [morph_rng.randint(1, 3) for _ in range(ncomp)]
+                freqs  = [morph_rng.randint(1, 2) for _ in range(ncomp)]
                 phases = [morph_rng.uniform(0.0, 2.0 * np.pi) for _ in range(ncomp)]
                 cp_comps.append((amps, freqs, phases))
             fam_comps.append(cp_comps)
@@ -418,7 +431,7 @@ def _forward_loop_schedule(frame_count):
 def _gif_delays_cs(frame_count, fps):
     """Per-frame GIF delays in centiseconds, spread to match target FPS.
 
-    GIF timing is quantized to 10 ms. Native rates such as the default 100 fps
+    GIF timing is quantized to 10 ms. Native rates such as 100 fps
     map exactly; non-native rates get extra centiseconds distributed across the
     frames so the total playback length remains correct.
     """
@@ -433,33 +446,78 @@ def _gif_delays_cs(frame_count, fps):
     return delays
 
 
-def _retime_gif(path, fps):
-    """Patch GIF Graphic Control Extension delays after PillowWriter saves."""
-    with open(path, "rb") as f:
-        data = bytearray(f.read())
-
-    gce_offsets = []
-    i = 0
-    while i <= len(data) - 8:
-        if data[i:i + 3] == b"\x21\xf9\x04":
-            gce_offsets.append(i)
-            i += 8
-        else:
-            i += 1
-
-    if not gce_offsets:
-        return
-
-    for offset, delay in zip(gce_offsets, _gif_delays_cs(len(gce_offsets), fps)):
-        data[offset + 4] = delay & 0xFF
-        data[offset + 5] = (delay >> 8) & 0xFF
-
-    with open(path, "wb") as f:
-        f.write(data)
 
 
-def generate_gif(seed=None, area_scale=1.0, frames=15 * 100, fps=100, size=None,
-                 n_petal=240, horizontal=False):
+
+def _loop_delta_arr(morph, fam_idx, cp_idx, axis, phases):
+    """Vectorized forward-loop displacement relative to phase 0 for an array of phases."""
+    w = _wiggle(morph, fam_idx, cp_idx, axis, phases) - _wiggle(morph, fam_idx, cp_idx, axis, 0.0)
+    # Clamp/mask for phase <= 0.0 or phase >= 1.0 (endpoints are exactly 0.0)
+    mask = (phases > 0.0) & (phases < 1.0)
+    return w * mask
+
+
+def _morphed_controls_arr(fam, morph, fam_idx, phases):
+    """Vectorized version of _morphed_controls for an array of phases.
+    Returns p1, p2 of shape [frames, 2] and R_m of shape [frames].
+    """
+    base_R = fam["R"]
+    max_radius_delta = 0.08 * MOTION_SCALE * base_R
+    radius_delta = MOTION_SCALE * _loop_delta_arr(morph, fam_idx, 2, 0, phases)
+    radius_delta = np.clip(radius_delta, -max_radius_delta, max_radius_delta)
+    R_m = base_R + radius_delta
+    radius_scale = R_m / base_R
+
+    # p1, p2 initially scaled with the radius scale (shape [frames, 2])
+    p1 = fam["p1"][np.newaxis, :] * radius_scale[:, np.newaxis]
+    p2 = fam["p2"][np.newaxis, :] * radius_scale[:, np.newaxis]
+
+    handle_scales = (0.45, 1.0)
+    for cp_idx, p in enumerate((p1, p2)):
+        scale = handle_scales[cp_idx]
+        delta_x = scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 0, phases)
+        delta_y = scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 1, phases)
+        p[:, 0] += delta_x
+        p[:, 1] += delta_y
+
+    return p1, p2, R_m
+
+
+def _cubic_bezier_arr(p0, p1, p2, p3, n=320):
+    """Evaluate a cubic Bezier curve at n points for all frames.
+    p1, p2, p3 have shape [frames, 2].
+    Returns x, y of shape [frames, n].
+    """
+    t = np.linspace(0, 1, n)[np.newaxis, :]  # shape [1, n]
+    
+    p1_x, p1_y = p1[:, 0:1], p1[:, 1:2]  # shape [frames, 1]
+    p2_x, p2_y = p2[:, 0:1], p2[:, 1:2]
+    p3_x, p3_y = p3[:, 0:1], p3[:, 1:2]
+    
+    x = ((1-t)**3 * p0[0] + 3*(1-t)**2 * t * p1_x +
+         3*(1-t) * t**2 * p2_x + t**3 * p3_x)
+    y = ((1-t)**3 * p0[1] + 3*(1-t)**2 * t * p1_y +
+         3*(1-t) * t**2 * p2_y + t**3 * p3_y)
+    return x, y
+
+
+def _petal_from_controls_arr(p1, p2, R, n=320):
+    """Closed bilateral-symmetric petal from origin to radius R for all frames.
+    Returns x_full, y_full of shape [frames, 2 * n].
+    """
+    p0 = np.array([0.0, 0.0])
+    p3 = np.zeros((len(R), 2))
+    p3[:, 0] = R
+    
+    x_up, y_up = _cubic_bezier_arr(p0, p1, p2, p3, n)
+    x_full = np.concatenate([x_up, x_up[:, ::-1]], axis=1)
+    y_full = np.concatenate([y_up, -y_up[:, ::-1]], axis=1)
+    return x_full, y_full
+
+
+def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
+                 fps=DEFAULT_GIF_FPS, size=None,
+                 n_petal=None, horizontal=False):
     """Animate the mandala as a smooth Bezier-handle wave.
 
     The pattern stays near full size throughout. Each petal starts at the
@@ -470,7 +528,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=15 * 100, fps=100, size=None,
     sharp turn on the outer circle. The animation phase only moves forward;
     offsets are measured relative to phase 0, so the first and last frames are
     the same un-morphed base without a back-and-forth retrace. Default GIF
-    timing uses a native 10 ms delay: 1500 frames at 100 fps for 15 seconds.
+    timing: 1400 frames at 93 fps for 15 seconds.
 
     Determinism: structure comes from prepare_pattern (same seed -> same
     families as the PNG); the wave uses a separate rng seeded from
@@ -480,8 +538,7 @@ def generate_gif(seed=None, area_scale=1.0, frames=15 * 100, fps=100, size=None,
     every frame.
     """
     try:
-        from matplotlib.animation import FuncAnimation, PillowWriter
-        import PIL  # noqa: F401  -- required by PillowWriter at save time
+        from PIL import Image, ImageChops
     except ImportError as exc:
         raise SystemExit("GIF export requires Pillow: pip install pillow") from exc
 
@@ -503,39 +560,177 @@ def generate_gif(seed=None, area_scale=1.0, frames=15 * 100, fps=100, size=None,
     ax.set_ylim(-half_h, half_h)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
+    # Dynamic Bezier step scaling based on target canvas resolution
+    if n_petal is None:
+        canvas_edge = max(W, H)
+        n_petal = max(60, min(320, int(canvas_edge * 120 / 720)))
+
     # Exact-count forward loop. The phase advances from 0 to 1 once; both ends
     # render the base shape, and every intermediate frame advances forward.
     schedule = _forward_loop_schedule(frames)
+    schedule_arr = np.array(schedule, dtype=np.float32)
 
-    def update(fi):
-        ax.clear()
-        ax.set_facecolor(MOCHA["base"])
-        ax.set_aspect("equal")
-        ax.axis("off")
-        ax.set_xlim(-half_w, half_w)
-        ax.set_ylim(-half_h, half_h)
+    from matplotlib.collections import LineCollection
 
-        phase = schedule[fi]
+    # Pre-create all line collections
+    line_collections = []
+    for fam in p["families"]:
+        sym_N = fam["N"]
+        k_indices = np.arange(sym_N)
+        t_c = 0.5 * (1.0 - np.cos(2.0 * np.pi * k_indices / sym_N))
+        
+        # Vectorized color lerping
+        rgb_colors = lerp_color_arr(p["accent1"], p["accent2"], t_c)
+        alphas = np.full((sym_N, 1), fam["alpha"], dtype=np.float32)
+        rgba_colors = np.concatenate([rgb_colors, alphas], axis=1)
+        
+        # Create a LineCollection with these segment colors and properties
+        lc = LineCollection([], colors=rgba_colors, linewidths=fam["lw"],
+                            capstyle="round", joinstyle="round")
+        ax.add_collection(lc)
+        line_collections.append(lc)
 
-        for fam_idx, fam in enumerate(p["families"]):
-            p1_m, p2_m, R_m = _morphed_controls(fam, morph, fam_idx, phase)
-            x_p, y_p = petal_from_controls(p1_m, p2_m, R_m, n=n_petal)
-            _draw_family(ax, x_p, y_p, fam["N"], fam["lw"], fam["alpha"],
-                         p["accent1"], p["accent2"])
+    # Pre-create static pupil patches (zorder ensures proper layering)
+    mid_color = lerp_color(p["accent1"], p["accent2"], 0.5)
+    pupil_circle = plt.Circle((0, 0), p["pupil_r"], color=MOCHA["crust"], zorder=20)
+    pupil_outline = plt.Circle((0, 0), p["pupil_r"], fill=False,
+                                edgecolor=mid_color, linewidth=0.6,
+                                alpha=0.55, zorder=21)
+    ax.add_patch(pupil_circle)
+    ax.add_patch(pupil_outline)
 
-        # Pupil is part of the static base; it stays constant.
-        _draw_pupil(ax, p["accent1"], p["accent2"], p["pupil_r"])
-        return []
+    # Precompute coordinates for all families and frames
+    precomputed_data = []
+    max_r_coord = 0.0
+    for fam_idx, fam in enumerate(p["families"]):
+        p1_m, p2_m, R_m = _morphed_controls_arr(fam, morph, fam_idx, schedule_arr)
+        max_r_coord = max(max_r_coord, float(np.max(R_m)))
+        
+        x_full, y_full = _petal_from_controls_arr(p1_m, p2_m, R_m, n=n_petal)
+        
+        sym_N = fam["N"]
+        angles = np.arange(sym_N) * (2.0 * np.pi / sym_N)
+        cos_a = np.cos(angles)[np.newaxis, :, np.newaxis]  # shape [1, N, 1]
+        sin_a = np.sin(angles)[np.newaxis, :, np.newaxis]  # shape [1, N, 1]
+        
+        x_full_exp = x_full[:, np.newaxis, :]
+        y_full_exp = y_full[:, np.newaxis, :]
+        
+        x_rot = (x_full_exp * cos_a - y_full_exp * sin_a).astype(np.float32)
+        y_rot = (x_full_exp * sin_a + y_full_exp * cos_a).astype(np.float32)
+        
+        # Stack coordinates to shape [frames, N, 2 * n_petal, 2] for LineCollection
+        coords = np.stack([x_rot, y_rot], axis=-1)
+        
+        precomputed_data.append(dict(coords=coords))
 
-    ani = FuncAnimation(fig, update, frames=len(schedule),
-                        interval=1000.0 / fps, blit=False)
+    w_fig, h_fig = fig.canvas.get_width_height()
+
+    # Process and optimize frames concurrently (non-dithered quantization)
+    def _optimize_frame(img):
+        return img.convert("RGB").convert("P", dither=Image.Dither.NONE)
+
+    # Calculate per-frame delays in milliseconds
+    delays_ms = [d * 10 for d in _gif_delays_cs(frames, fps)]
+
+    # Draw and process the first frame (frame 0) to use as the base image for save()
+    for fam_idx, lc in enumerate(line_collections):
+        coords = precomputed_data[fam_idx]["coords"]
+        lc.set_segments(coords[0])
+    fig.canvas.draw()
+    rgba_buffer = fig.canvas.buffer_rgba()
+    first_img = Image.frombuffer("RGBA", (w_fig, h_fig), rgba_buffer, "raw", "RGBA", 0, 1).copy()
+    first_p = _optimize_frame(first_img)
+    first_p.info['duration'] = delays_ms[0]
+
+    # Bounded concurrency frame streaming generator with on-the-fly deduplication
+    def frame_generator():
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        from PIL import ImageChops
+        
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count, 8)
+        active_limit = 2 * max_workers
+        
+        def draw_frame(fi):
+            for fam_idx, lc in enumerate(line_collections):
+                coords = precomputed_data[fam_idx]["coords"]
+                lc.set_segments(coords[fi])
+            fig.canvas.draw()
+            rgba_buffer = fig.canvas.buffer_rgba()
+            return Image.frombuffer("RGBA", (w_fig, h_fig), rgba_buffer, "raw", "RGBA", 0, 1).copy()
+
+        futures = {}
+        next_submit = 1
+        next_yield = 1
+        
+        def submit_next():
+            nonlocal next_submit
+            if next_submit < len(schedule):
+                img = draw_frame(next_submit)
+                fut = executor.submit(_optimize_frame, img)
+                futures[next_submit] = fut
+                next_submit += 1
+
+        buffered_frame = None
+        buffered_delay = 0
+        total_saved_frames = 1
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Pre-submit initial batch
+            for _ in range(active_limit):
+                submit_next()
+                
+            while next_yield < len(schedule) or buffered_frame is not None:
+                if next_yield < len(schedule):
+                    submit_next()
+                    
+                    fut = futures.pop(next_yield)
+                    curr_frame = fut.result()
+                    curr_delay = delays_ms[next_yield]
+                    next_yield += 1
+                    
+                    if buffered_frame is None:
+                        buffered_frame = curr_frame
+                        buffered_delay = curr_delay
+                    else:
+                        diff = ImageChops.difference(curr_frame, buffered_frame)
+                        if diff.getbbox() is None:
+                            # Identical frame: accumulate delay
+                            buffered_delay += curr_delay
+                        else:
+                            # Yield the buffered frame with its final accumulated delay
+                            buffered_frame.info['duration'] = buffered_delay
+                            total_saved_frames += 1
+                            yield buffered_frame
+                            
+                            # Buffer the new unique frame
+                            buffered_frame = curr_frame
+                            buffered_delay = curr_delay
+                else:
+                    # Final yield at end of stream
+                    if buffered_frame is not None:
+                        buffered_frame.info['duration'] = buffered_delay
+                        total_saved_frames += 1
+                        yield buffered_frame
+                        buffered_frame = None
+
+        print(f"Frame deduplication: reduced from {len(schedule)} to {total_saved_frames} frames.")
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     suffix = _output_suffix(area_scale, horizontal)
     out = os.path.join(RESULTS_DIR, f"catpattern_{seed}{suffix}.gif")
-    ani.save(out, writer=PillowWriter(fps=fps),
-             savefig_kwargs=dict(facecolor=MOCHA["base"]))
-    _retime_gif(out, fps)
+
+    # Save the frames as an optimized GIF directly using PIL via streaming
+    first_p.save(
+        out,
+        save_all=True,
+        append_images=frame_generator(),
+        loop=0,
+        optimize=True,
+        disposal=1
+    )
     plt.close(fig)
     print(f"Saved: {out}")
     return out
@@ -546,8 +741,8 @@ if __name__ == "__main__":
     seed = None
     gif = False
     horizontal = False
-    frames = 15 * 100
-    fps = 100
+    frames = DEFAULT_GIF_FRAMES
+    fps = DEFAULT_GIF_FPS
     gif_size = None
 
     args = sys.argv[1:]

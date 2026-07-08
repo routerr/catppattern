@@ -60,10 +60,10 @@ convention.
    rotational symmetry).
 5. Draw a central "pupil" disc in `crust` with a thin mid-colour outline.
 6. Save the figure (fixed size 3840×2160 @ 100 dpi, landscape) and close it. The GIF
-   path instead saves a square (default 720×720) animation via `FuncAnimation` +
-   `PillowWriter`, saving the full-size animation by rebuilding every petal from
-   its (envelope-gated) morphed control points per frame, so the first and last
-   frame equal the un-morphed base.
+   path instead saves a 16:9 4K (default 3840×2160) animation via raw PIL
+   streaming frame assembly (yielding frames on the fly to minimize memory usage,
+   bounded concurrency, and on-the-fly deduplication), rebuilding every petal from its
+   (envelope-gated) morphed control points per frame.
 
 ### Key invariants when modifying
 
@@ -123,10 +123,10 @@ against a reference image — none exists yet.
 - The PNG path needs only numpy+matplotlib; the `-gif` path additionally needs
   **Pillow** (`pip install pillow`). The `generate.sh` resolver probes for
   `numpy+matplotlib+Pillow` so the batch runner works for both modes. The GIF
-  is square (default `--gif-size 720`) with ±0.5 limits, so the circular mandala
-  fills the frame. The animation is at full size throughout (no bloom), so no
+  is landscape 16:9 (default `--gif-size 3840`) with ±0.5 vertical limits, so the circular mandala
+  fills the frame vertically. The animation is at full size throughout (no bloom), so no
   consecutive frames are pixel-identical and the saved frame count equals the
-  schedule length (`2*half + 1`).
+  schedule length (`frames`).
 - `generate.sh` may fail to resolve `python` under some nested-shell invocations on
   Windows (mvdan/sh PATH quirks); it probes `python`/`python3`/`py` for one with
   numpy+matplotlib+Pillow and uses its absolute path. If it still fails, run `sh generate.sh`
