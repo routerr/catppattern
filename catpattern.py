@@ -13,13 +13,13 @@ Usage:
     python catpattern.py [seed] [-s|-xs|-xxs|-xxxs] [-h|--horizontal] [-gif] [--frames N] [--fps N] [--gif-size PX]
 
 Modes:
-    (default)  render a static PNG (catpattern_<seed>.png)
+    (default)  render a static SVG (catpattern_<seed>.svg)
     -gif       render an animated GIF (catpattern_<seed>.gif): the mandala
                stays near full size with a bounded outer-radius wave, while
                its petal Bezier control points and outer endpoint radius
                wiggle along seeded random sinusoid paths whose phase always
                advances forward. The first and last frames are the un-morphed
-               base (the same mandala as the static PNG), so the GIF loops
+               base (the same mandala as the static SVG), so the GIF loops
                cleanly without retracing backward. Same seed
                -> same families as the PNG plus a deterministic morph.
 
@@ -400,7 +400,7 @@ def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     os.makedirs(RESULTS_DIR, exist_ok=True)
     suffix = _output_suffix(area_scale, horizontal)
-    out = os.path.join(RESULTS_DIR, f"catpattern_{seed}{suffix}.png")
+    out = os.path.join(RESULTS_DIR, f"catpattern_{seed}{suffix}.svg")
     fig.savefig(
         out,
         dpi=dpi,

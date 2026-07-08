@@ -27,9 +27,9 @@ sh generate.sh 5 -gif
 sh generate.sh 5 -gif -s
 ```
 
-Each run writes `catpattern_<seed>.png` (or `.gif` with `-gif`) into the **script's own `results/` directory**
+Each run writes `catpattern_<seed>.svg` (or `.gif` with `-gif`) into the **script's own `results/` directory**
 (absolute, CWD-independent) and prints the seed + chosen accent colours to stdout. The
-PNGs already committed in the repo root are old sample outputs from before the `results/`
+PNGs and SVGs already committed in the repo root are old sample outputs from before the `results/`
 convention.
 
 ## Determinism model (important)
@@ -43,7 +43,7 @@ convention.
 - In `-gif` mode an extra `random.Random((seed + 1) & 0x7FFFFFFF)` (`morph_rng`)
   drives the per-frame petal morph. It is created **after** `prepare_pattern` builds
   the families, so it is decoupled from the structure draws: a given seed yields the
-  same families in both PNG and GIF mode, plus a fully reproducible morph path. GIFs
+  same families in both SVG and GIF mode, plus a fully reproducible morph path. GIFs
   are byte-reproducible for a given seed.
 
 ## Architecture / control flow
@@ -107,14 +107,14 @@ on hue) on HSL hues from `hex_to_hsl` (via `colorsys.rgb_to_hls`). It uses the s
 if no valid pair is found in 200 draws (statistically unreachable).
 
 This is **seed-breaking**: a given seed now maps to different accents than it did under
-the old `rng.sample` call, because the rng draw count changed. Old PNGs committed for a
+the old `rng.sample` call, because the rng draw count changed. Old SVGs/PNGs committed for a
 seed are no longer reproducible with the same seed.
 
 ## Testing
 
 There is **no test suite** and no test framework configured. Verification is visual:
-run with a known seed and eyeball the output PNG, or compare against a committed
-sample (e.g. `catpattern_42.png`). Regression testing would require hashing/SSIM
+run with a known seed and eyeball the output SVG, or compare against a committed
+sample (e.g. `catpattern_42.svg`). Regression testing would require hashing/SSIM
 against a reference image — none exists yet.
 
 ## Notable gotchas
@@ -125,7 +125,7 @@ against a reference image — none exists yet.
   the invocation CWD doesn't matter.
 - `bbox_inches="tight"` is used on savefig; combined with the manual `subplots_adjust`
   it controls the final framing. Tweaking either can shift the rendered bounds.
-- The PNG path needs only numpy+matplotlib; the `-gif` path additionally needs
+- The SVG path needs only numpy+matplotlib; the `-gif` path additionally needs
   **Pillow** (`pip install pillow`). The `generate.sh` resolver probes for
   `numpy+matplotlib+Pillow` so the batch runner works for both modes. The GIF
   is landscape 16:9 (default `--gif-size 3840`) with ±0.5 vertical limits, so the circular mandala
