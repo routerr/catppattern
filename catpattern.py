@@ -52,44 +52,56 @@ HORIZONTAL_WALLPAPER_SIZE = (2532, 1170)
 
 
 MOCHA = {
-    "base":      "#11111b",
-    "mantle":    "#181825",
-    "crust":     "#11111b",
-    "surface0":  "#313244",
-    "surface1":  "#45475a",
-    "surface2":  "#585b70",
-    "overlay0":  "#6c7086",
+    "base": "#11111b",
+    "mantle": "#181825",
+    "crust": "#11111b",
+    "surface0": "#313244",
+    "surface1": "#45475a",
+    "surface2": "#585b70",
+    "overlay0": "#6c7086",
     "rosewater": "#f5e0dc",
-    "flamingo":  "#f2cdcd",
-    "pink":      "#f5c2e7",
-    "mauve":     "#cba6f7",
-    "red":       "#f38ba8",
-    "maroon":    "#eba0ac",
-    "peach":     "#fab387",
-    "yellow":    "#f9e2af",
-    "green":     "#a6e3a1",
-    "teal":      "#94e2d5",
-    "sky":       "#89dceb",
-    "sapphire":  "#74c7ec",
-    "blue":      "#89b4fa",
-    "lavender":  "#b4befe",
+    "flamingo": "#f2cdcd",
+    "pink": "#f5c2e7",
+    "mauve": "#cba6f7",
+    "red": "#f38ba8",
+    "maroon": "#eba0ac",
+    "peach": "#fab387",
+    "yellow": "#f9e2af",
+    "green": "#a6e3a1",
+    "teal": "#94e2d5",
+    "sky": "#89dceb",
+    "sapphire": "#74c7ec",
+    "blue": "#89b4fa",
+    "lavender": "#b4befe",
 }
 
 ACCENTS = [
-    "rosewater", "flamingo", "pink", "mauve", "red", "maroon",
-    "peach", "yellow", "green", "teal", "sky", "sapphire", "blue", "lavender",
+    "rosewater",
+    "flamingo",
+    "pink",
+    "mauve",
+    "red",
+    "maroon",
+    "peach",
+    "yellow",
+    "green",
+    "teal",
+    "sky",
+    "sapphire",
+    "blue",
+    "lavender",
 ]
 
 
 def hex_to_rgb(h):
     h = h.lstrip("#")
-    return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
 
 
 def hex_to_hsl(h):
     """Hex (#rrggbb) → (hue, saturation, lightness), each in [0, 1]."""
     r, g, b = hex_to_rgb(h)
-    return colorsys.rgb_to_hls(r, g, b)   # returns (h, l, s)
+    return colorsys.rgb_to_hls(r, g, b)  # returns (h, l, s)
 
 
 def hue_distance(h1, h2):
@@ -112,14 +124,18 @@ def pick_distinct_accents(rng):
     MIN_HUE_GAP = 0.12
     for _ in range(200):
         a, b = rng.sample(ACCENTS, 2)
-        if hue_distance(hex_to_hsl(MOCHA[a])[0], hex_to_hsl(MOCHA[b])[0]) >= MIN_HUE_GAP:
+        if (
+            hue_distance(hex_to_hsl(MOCHA[a])[0], hex_to_hsl(MOCHA[b])[0])
+            >= MIN_HUE_GAP
+        ):
             return a, b
     # Fallback (statistically unreachable): widest pair in the palette.
     best, best_d = None, -1.0
     for i in range(len(ACCENTS)):
         for j in range(i + 1, len(ACCENTS)):
-            d = hue_distance(hex_to_hsl(MOCHA[ACCENTS[i]])[0],
-                             hex_to_hsl(MOCHA[ACCENTS[j]])[0])
+            d = hue_distance(
+                hex_to_hsl(MOCHA[ACCENTS[i]])[0], hex_to_hsl(MOCHA[ACCENTS[j]])[0]
+            )
             if d > best_d:
                 best, best_d = (ACCENTS[i], ACCENTS[j]), d
     return best
@@ -142,10 +158,18 @@ def cubic_bezier(p0, p1, p2, p3, n=320):
     """Evaluate a cubic Bezier curve at n points clustered at the endpoints."""
     linear_t = np.linspace(0, 1, n)
     t = 0.5 * (1.0 - np.cos(np.pi * linear_t))
-    x = ((1-t)**3*p0[0] + 3*(1-t)**2*t*p1[0] +
-         3*(1-t)*t**2*p2[0] + t**3*p3[0])
-    y = ((1-t)**3*p0[1] + 3*(1-t)**2*t*p1[1] +
-         3*(1-t)*t**2*p2[1] + t**3*p3[1])
+    x = (
+        (1 - t) ** 3 * p0[0]
+        + 3 * (1 - t) ** 2 * t * p1[0]
+        + 3 * (1 - t) * t**2 * p2[0]
+        + t**3 * p3[0]
+    )
+    y = (
+        (1 - t) ** 3 * p0[1]
+        + 3 * (1 - t) ** 2 * t * p1[1]
+        + 3 * (1 - t) * t**2 * p2[1]
+        + t**3 * p3[1]
+    )
     return x, y
 
 
@@ -155,7 +179,7 @@ def petal_from_controls(p1, p2, R, n=320):
     lower arc = mirror (y -> -y).  Symmetric about the x-axis, so rotating
     it preserves strict rotational symmetry for the whole family."""
     p0 = np.array([0.0, 0.0])
-    p3 = np.array([R,   0.0])
+    p3 = np.array([R, 0.0])
     x_up, y_up = cubic_bezier(p0, p1, p2, p3, n)
     x_full = np.concatenate([x_up, x_up[::-1]])
     y_full = np.concatenate([y_up, -y_up[::-1]])
@@ -179,7 +203,7 @@ def random_petal(R, rng, n=320):
     the petal from its control points.
     """
     r1 = rng.uniform(0.06, 0.72) * R
-    a1 = rng.uniform(-0.25, 0.85) * np.pi   # allow dip below x-axis -> S curves
+    a1 = rng.uniform(-0.25, 0.85) * np.pi  # allow dip below x-axis -> S curves
     p1 = np.array([r1 * np.cos(a1), r1 * np.sin(a1)])
 
     r2 = rng.uniform(0.22, 0.96) * R
@@ -202,18 +226,34 @@ def _draw_family(ax, x_petal, y_petal, sym_N, lw, alpha, accent1, accent2):
         t_c = 0.5 * (1.0 - np.cos(2.0 * np.pi * k / sym_N))
         color = lerp_color(accent1, accent2, t_c)
 
-        ax.plot(x_rot, y_rot, color=color, alpha=alpha,
-                linewidth=lw, solid_capstyle="round", solid_joinstyle="round",
-                antialiased=(lw >= 0.8))
+        ax.plot(
+            x_rot,
+            y_rot,
+            color=color,
+            alpha=alpha,
+            linewidth=lw,
+            solid_capstyle="round",
+            solid_joinstyle="round",
+            antialiased=(lw >= 0.8),
+        )
 
 
 def _draw_pupil(ax, accent1, accent2, pupil_r, scale_factor=1.0):
     """Central pupil disc in crust with a thin mid-colour outline."""
     mid_color = lerp_color(accent1, accent2, 0.5)
     ax.add_patch(plt.Circle((0, 0), pupil_r, color=MOCHA["crust"], zorder=20))
-    ax.add_patch(plt.Circle((0, 0), pupil_r, fill=False,
-                            edgecolor=mid_color, linewidth=1.1 * scale_factor,
-                            alpha=0.55, zorder=21, antialiased=(1.1 * scale_factor >= 0.8)))
+    ax.add_patch(
+        plt.Circle(
+            (0, 0),
+            pupil_r,
+            fill=False,
+            edgecolor=mid_color,
+            linewidth=1.1 * scale_factor,
+            alpha=0.55,
+            zorder=21,
+            antialiased=(1.1 * scale_factor >= 0.8),
+        )
+    )
 
 
 def build_families(rng, semi_major, lw_scale):
@@ -224,19 +264,23 @@ def build_families(rng, semi_major, lw_scale):
     num_families = rng.randint(2, 4)
     families = []
     for i in range(num_families):
-        R_fam = semi_major * rng.uniform(0.65, 1.00)   # each family can differ in size
-        sym_N = rng.randint(14, 46)                     # symmetry order (copies)
+        R_fam = semi_major * rng.uniform(0.65, 1.00)  # each family can differ in size
+        sym_N = rng.randint(14, 46)  # symmetry order (copies)
         # Mild density-aware stroke: slightly thicker when sparse, slightly
         # thinner when dense. Overall bump is small to keep patterns light.
-        density = (0.7 * (sym_N - 14) / 32.0 +
-                   0.3 * (num_families - 2) / 2.0)      # 0 sparse ... 1 dense
-        lw    = rng.uniform(1.4, 2.4) * (1.0 - 0.15 * density) * lw_scale * 1.8
+        density = (
+            0.7 * (sym_N - 14) / 32.0 + 0.3 * (num_families - 2) / 2.0
+        )  # 0 sparse ... 1 dense
+        lw = rng.uniform(1.4, 2.4) * (1.0 - 0.15 * density) * lw_scale * 1.8
         alpha = rng.uniform(0.28, 0.55)
         x_p, y_p, p1, p2 = random_petal(R_fam, rng)
-        families.append(dict(x=x_p, y=y_p, N=sym_N, lw=lw, alpha=alpha,
-                             R=R_fam, p1=p1, p2=p2))
-        print(f"  Family {i+1}: N={sym_N}, R={R_fam:.3f}, "
-              f"lw={lw:.2f}, alpha={alpha:.2f}")
+        families.append(
+            dict(x=x_p, y=y_p, N=sym_N, lw=lw, alpha=alpha, R=R_fam, p1=p1, p2=p2)
+        )
+        print(
+            f"  Family {i + 1}: N={sym_N}, R={R_fam:.3f}, "
+            f"lw={lw:.2f}, alpha={alpha:.2f}"
+        )
     return families
 
 
@@ -249,8 +293,13 @@ def prepare_pattern(seed, area_scale):
         seed = int(time.time())
 
     rng = random.Random(seed)
-    tag = {1.0: "", 0.5: "  [small]", 0.25: "  [extra-small]",
-           0.1: "  [micro]", 0.05: "  [nano]"}.get(area_scale, f"  [{area_scale:.0%}]")
+    tag = {
+        1.0: "",
+        0.5: "  [small]",
+        0.25: "  [extra-small]",
+        0.1: "  [micro]",
+        0.05: "  [nano]",
+    }.get(area_scale, f"  [{area_scale:.0%}]")
     print(f"Seed: {seed}{tag}")
 
     accent1_name, accent2_name = pick_distinct_accents(rng)
@@ -260,26 +309,34 @@ def prepare_pattern(seed, area_scale):
 
     # semi_major is the outer radius in normalised coords (view = +/-0.5 height)
     semi_major = rng.uniform(0.34, 0.46)
-    pupil_r    = semi_major * rng.uniform(0.06, 0.13)
+    pupil_r = semi_major * rng.uniform(0.06, 0.13)
 
     # Size modes: shrink the centered pattern to a fraction of its area.
     if area_scale != 1.0:
-        k = area_scale ** 0.5
+        k = area_scale**0.5
         semi_major *= k
-        pupil_r    *= k
+        pupil_r *= k
 
-    lw_scale = area_scale ** 0.5
+    lw_scale = area_scale**0.5
     families = build_families(rng, semi_major, lw_scale)
 
-    return dict(seed=seed, rng=rng,
-                accent1=accent1, accent2=accent2,
-                accent1_name=accent1_name, accent2_name=accent2_name,
-                semi_major=semi_major, pupil_r=pupil_r, families=families)
+    return dict(
+        seed=seed,
+        rng=rng,
+        accent1=accent1,
+        accent2=accent2,
+        accent1_name=accent1_name,
+        accent2_name=accent2_name,
+        semi_major=semi_major,
+        pupil_r=pupil_r,
+        families=families,
+    )
 
 
 def _area_suffix(area_scale):
-    return {1.0: "", 0.5: "_small", 0.25: "_xs", 0.1: "_xxs",
-            0.05: "_xxxs"}.get(area_scale, f"_{int(area_scale*100)}")
+    return {1.0: "", 0.5: "_small", 0.25: "_xs", 0.1: "_xxs", 0.05: "_xxxs"}.get(
+        area_scale, f"_{int(area_scale * 100)}"
+    )
 
 
 def _output_suffix(area_scale, horizontal):
@@ -313,7 +370,7 @@ def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
 
     # -- Figure -------------------------------------------------------------------
     W, H = HORIZONTAL_WALLPAPER_SIZE if horizontal else PNG_SIZE
-    dpi   = 100
+    dpi = 100
     fig, ax = plt.subplots(figsize=(W / dpi, H / dpi), dpi=dpi)
     fig.patch.set_facecolor(MOCHA["base"])
     ax.set_facecolor(MOCHA["base"])
@@ -327,8 +384,16 @@ def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
     # -- Draw ---------------------------------------------------------------------
     scale_factor = H / 2160.0
     for fam in p["families"]:
-        _draw_family(ax, fam["x"], fam["y"], fam["N"], fam["lw"] * scale_factor,
-                     fam["alpha"], p["accent1"], p["accent2"])
+        _draw_family(
+            ax,
+            fam["x"],
+            fam["y"],
+            fam["N"],
+            fam["lw"] * scale_factor,
+            fam["alpha"],
+            p["accent1"],
+            p["accent2"],
+        )
     _draw_pupil(ax, p["accent1"], p["accent2"], p["pupil_r"], scale_factor)
 
     # -- Save ---------------------------------------------------------------------
@@ -336,8 +401,14 @@ def generate_pattern(seed=None, area_scale=1.0, horizontal=False):
     os.makedirs(RESULTS_DIR, exist_ok=True)
     suffix = _output_suffix(area_scale, horizontal)
     out = os.path.join(RESULTS_DIR, f"catpattern_{seed}{suffix}.png")
-    fig.savefig(out, dpi=dpi, facecolor=MOCHA["base"],
-                edgecolor="none", bbox_inches="tight", pad_inches=0)
+    fig.savefig(
+        out,
+        dpi=dpi,
+        facecolor=MOCHA["base"],
+        edgecolor="none",
+        bbox_inches="tight",
+        pad_inches=0,
+    )
     plt.close(fig)
     print(f"Saved: {out}")
     return out
@@ -358,16 +429,18 @@ def _morph_components(families, morph_rng):
         for _ in (0, 1):  # p1, p2
             cp_comps = []
             for _axis in (0, 1):  # x, y
-                ncomp  = morph_rng.randint(2, 3)
-                amps   = [morph_rng.uniform(0.04, 0.11) * R for _ in range(ncomp)]
-                freqs  = [morph_rng.randint(1, 2) for _ in range(ncomp)]
+                ncomp = morph_rng.randint(2, 3)
+                amps = [morph_rng.uniform(0.04, 0.11) * R for _ in range(ncomp)]
+                freqs = [morph_rng.randint(1, 2) for _ in range(ncomp)]
                 phases = [morph_rng.uniform(0.0, 2.0 * np.pi) for _ in range(ncomp)]
                 cp_comps.append((amps, freqs, phases))
             fam_comps.append(cp_comps)
 
-        radius_comps = ([morph_rng.uniform(0.025, 0.055) * R],
-                        [morph_rng.randint(1, 2)],
-                        [morph_rng.uniform(0.0, 2.0 * np.pi)])
+        radius_comps = (
+            [morph_rng.uniform(0.025, 0.055) * R],
+            [morph_rng.randint(1, 2)],
+            [morph_rng.uniform(0.0, 2.0 * np.pi)],
+        )
         fam_comps.append([radius_comps])  # pseudo control point 2, axis 0
         morph.append(fam_comps)
     return morph
@@ -380,8 +453,9 @@ def _wiggle(morph, fam_idx, cp_idx, axis, t):
     Axis is 0=x / 1=y for controls; radius uses axis 0.
     """
     amps, freqs, phases = morph[fam_idx][cp_idx][axis]
-    return sum(a * np.sin(2.0 * np.pi * f * t + ph)
-               for a, f, ph in zip(amps, freqs, phases))
+    return sum(
+        a * np.sin(2.0 * np.pi * f * t + ph) for a, f, ph in zip(amps, freqs, phases)
+    )
 
 
 def _loop_delta(morph, fam_idx, cp_idx, axis, phase):
@@ -392,8 +466,9 @@ def _loop_delta(morph, fam_idx, cp_idx, axis, phase):
     """
     if phase <= 0.0 or phase >= 1.0:
         return 0.0
-    return (_wiggle(morph, fam_idx, cp_idx, axis, phase) -
-            _wiggle(morph, fam_idx, cp_idx, axis, 0.0))
+    return _wiggle(morph, fam_idx, cp_idx, axis, phase) - _wiggle(
+        morph, fam_idx, cp_idx, axis, 0.0
+    )
 
 
 def _morphed_controls(fam, morph, fam_idx, phase):
@@ -449,12 +524,11 @@ def _gif_delays_cs(frame_count, fps):
     return delays
 
 
-
-
-
 def _loop_delta_arr(morph, fam_idx, cp_idx, axis, phases):
     """Vectorized forward-loop displacement relative to phase 0 for an array of phases."""
-    w = _wiggle(morph, fam_idx, cp_idx, axis, phases) - _wiggle(morph, fam_idx, cp_idx, axis, 0.0)
+    w = _wiggle(morph, fam_idx, cp_idx, axis, phases) - _wiggle(
+        morph, fam_idx, cp_idx, axis, 0.0
+    )
     # Clamp/mask for phase <= 0.0 or phase >= 1.0 (endpoints are exactly 0.0)
     mask = (phases > 0.0) & (phases < 1.0)
     return w * mask
@@ -478,8 +552,12 @@ def _morphed_controls_arr(fam, morph, fam_idx, phases):
     handle_scales = (0.45, 1.0)
     for cp_idx, p in enumerate((p1, p2)):
         scale = handle_scales[cp_idx]
-        delta_x = scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 0, phases)
-        delta_y = scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 1, phases)
+        delta_x = (
+            scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 0, phases)
+        )
+        delta_y = (
+            scale * MOTION_SCALE * _loop_delta_arr(morph, fam_idx, cp_idx, 1, phases)
+        )
         p[:, 0] += delta_x
         p[:, 1] += delta_y
 
@@ -493,15 +571,23 @@ def _cubic_bezier_arr(p0, p1, p2, p3, n=320):
     """
     linear_t = np.linspace(0, 1, n)
     t = (0.5 * (1.0 - np.cos(np.pi * linear_t)))[np.newaxis, :]  # shape [1, n]
-    
+
     p1_x, p1_y = p1[:, 0:1], p1[:, 1:2]  # shape [frames, 1]
     p2_x, p2_y = p2[:, 0:1], p2[:, 1:2]
     p3_x, p3_y = p3[:, 0:1], p3[:, 1:2]
-    
-    x = ((1-t)**3 * p0[0] + 3*(1-t)**2 * t * p1_x +
-         3*(1-t) * t**2 * p2_x + t**3 * p3_x)
-    y = ((1-t)**3 * p0[1] + 3*(1-t)**2 * t * p1_y +
-         3*(1-t) * t**2 * p2_y + t**3 * p3_y)
+
+    x = (
+        (1 - t) ** 3 * p0[0]
+        + 3 * (1 - t) ** 2 * t * p1_x
+        + 3 * (1 - t) * t**2 * p2_x
+        + t**3 * p3_x
+    )
+    y = (
+        (1 - t) ** 3 * p0[1]
+        + 3 * (1 - t) ** 2 * t * p1_y
+        + 3 * (1 - t) * t**2 * p2_y
+        + t**3 * p3_y
+    )
     return x, y
 
 
@@ -512,7 +598,7 @@ def _petal_from_controls_arr(p1, p2, R, n=320):
     p0 = np.array([0.0, 0.0])
     p3 = np.zeros((len(R), 2))
     p3[:, 0] = R
-    
+
     x_up, y_up = _cubic_bezier_arr(p0, p1, p2, p3, n)
     x_full = np.concatenate([x_up, x_up[:, ::-1]], axis=1)
     y_full = np.concatenate([y_up, -y_up[:, ::-1]], axis=1)
@@ -523,6 +609,7 @@ def _stream_save_gif(out, first_p, frame_iterable):
     """Write GIF frames directly to a file stream one-by-one to prevent Pillow's
     default behavior of accumulating all normalized frame copies in memory."""
     from PIL import GifImagePlugin
+
     with open(out, "wb") as fp:
         info = {
             "loop": 0,
@@ -532,14 +619,14 @@ def _stream_save_gif(out, first_p, frame_iterable):
         }
         first_p.encoderinfo = info
         first_normalized = GifImagePlugin._normalize_palette(first_p, None, info)
-        
+
         # Write global header using the first frame
         for block in GifImagePlugin._get_global_header(first_normalized, info):
             fp.write(block)
-            
+
         # Write the base/first frame
         GifImagePlugin._write_frame_data(fp, first_normalized, (0, 0), info)
-        
+
         # Sequentially write each frame and discard it immediately
         for im in frame_iterable:
             frame_info = {
@@ -550,14 +637,20 @@ def _stream_save_gif(out, first_p, frame_iterable):
             im.encoderinfo = frame_info
             p_im = GifImagePlugin._normalize_palette(im, None, frame_info)
             GifImagePlugin._write_frame_data(fp, p_im, (0, 0), frame_info)
-            
+
         # Write closing block
         fp.write(b";")
 
 
-def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
-                 fps=DEFAULT_GIF_FPS, size=None,
-                 n_petal=None, horizontal=False):
+def generate_gif(
+    seed=None,
+    area_scale=1.0,
+    frames=DEFAULT_GIF_FRAMES,
+    fps=DEFAULT_GIF_FPS,
+    size=None,
+    n_petal=None,
+    horizontal=False,
+):
     """Animate the mandala as a smooth Bezier-handle wave.
 
     The pattern stays near full size throughout. Each petal starts at the
@@ -621,26 +714,37 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         sym_N = fam["N"]
         k_indices = np.arange(sym_N)
         t_c = 0.5 * (1.0 - np.cos(2.0 * np.pi * k_indices / sym_N))
-        
+
         # Vectorized color lerping
         rgb_colors = lerp_color_arr(p["accent1"], p["accent2"], t_c)
         alphas = np.full((sym_N, 1), fam["alpha"], dtype=np.float32)
         rgba_colors = np.concatenate([rgb_colors, alphas], axis=1)
-        
+
         # Create a LineCollection with these segment colors and properties
-        lc = LineCollection([], colors=rgba_colors, linewidths=fam["lw"] * scale_factor,
-                            capstyle="round", joinstyle="round",
-                            antialiaseds=(fam["lw"] * scale_factor >= 0.8))
+        lc = LineCollection(
+            [],
+            colors=rgba_colors,
+            linewidths=fam["lw"] * scale_factor,
+            capstyle="round",
+            joinstyle="round",
+            antialiaseds=(fam["lw"] * scale_factor >= 0.8),
+        )
         ax.add_collection(lc)
         line_collections.append(lc)
 
     # Pre-create static pupil patches (zorder ensures proper layering)
     mid_color = lerp_color(p["accent1"], p["accent2"], 0.5)
     pupil_circle = plt.Circle((0, 0), p["pupil_r"], color=MOCHA["crust"], zorder=20)
-    pupil_outline = plt.Circle((0, 0), p["pupil_r"], fill=False,
-                                edgecolor=mid_color, linewidth=1.1 * scale_factor,
-                                alpha=0.55, zorder=21,
-                                antialiased=(1.1 * scale_factor >= 0.8))
+    pupil_outline = plt.Circle(
+        (0, 0),
+        p["pupil_r"],
+        fill=False,
+        edgecolor=mid_color,
+        linewidth=1.1 * scale_factor,
+        alpha=0.55,
+        zorder=21,
+        antialiased=(1.1 * scale_factor >= 0.8),
+    )
     ax.add_patch(pupil_circle)
     ax.add_patch(pupil_outline)
 
@@ -650,23 +754,23 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
     for fam_idx, fam in enumerate(p["families"]):
         p1_m, p2_m, R_m = _morphed_controls_arr(fam, morph, fam_idx, schedule_arr)
         max_r_coord = max(max_r_coord, float(np.max(R_m)))
-        
+
         x_full, y_full = _petal_from_controls_arr(p1_m, p2_m, R_m, n=n_petal)
-        
+
         sym_N = fam["N"]
         angles = np.arange(sym_N) * (2.0 * np.pi / sym_N)
         cos_a = np.cos(angles)[np.newaxis, :, np.newaxis]  # shape [1, N, 1]
         sin_a = np.sin(angles)[np.newaxis, :, np.newaxis]  # shape [1, N, 1]
-        
+
         x_full_exp = x_full[:, np.newaxis, :]
         y_full_exp = y_full[:, np.newaxis, :]
-        
+
         x_rot = (x_full_exp * cos_a - y_full_exp * sin_a).astype(np.float32)
         y_rot = (x_full_exp * sin_a + y_full_exp * cos_a).astype(np.float32)
-        
+
         # Stack coordinates to shape [frames, N, 2 * n_petal, 2] for LineCollection
         coords = np.stack([x_rot, y_rot], axis=-1)
-        
+
         precomputed_data.append(dict(coords=coords))
 
     w_fig, h_fig = fig.canvas.get_width_height()
@@ -684,9 +788,11 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         lc.set_segments(coords[0])
     fig.canvas.draw()
     rgba_buffer = fig.canvas.buffer_rgba()
-    first_img = Image.frombuffer("RGBA", (w_fig, h_fig), rgba_buffer, "raw", "RGBA", 0, 1).copy()
+    first_img = Image.frombuffer(
+        "RGBA", (w_fig, h_fig), rgba_buffer, "raw", "RGBA", 0, 1
+    ).copy()
     first_p = _optimize_frame(first_img)
-    first_p.info['duration'] = delays_ms[0]
+    first_p.info["duration"] = delays_ms[0]
 
     # Bounded concurrency frame streaming generator with on-the-fly deduplication and buffer pool
     def frame_generator():
@@ -694,32 +800,34 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         import os
         import gc
         from PIL import ImageChops
-        
+
         cpu_count = os.cpu_count() or 4
         max_workers = min(cpu_count, 8)
         active_limit = 2 * max_workers
-        
+
         # Pre-allocate buffer pool (NumPy arrays) to avoid allocation overhead
-        buffer_pool = [np.empty((h_fig, w_fig, 4), dtype=np.uint8) for _ in range(active_limit + 2)]
-        
+        buffer_pool = [
+            np.empty((h_fig, w_fig, 4), dtype=np.uint8) for _ in range(active_limit + 2)
+        ]
+
         def draw_frame(fi, buf):
             for fam_idx, lc in enumerate(line_collections):
                 coords = precomputed_data[fam_idx]["coords"]
                 lc.set_segments(coords[fi])
             fig.canvas.draw()
             rgba_buffer = fig.canvas.buffer_rgba()
-            
+
             # Copy memoryview data directly into our leased buffer array
             src = np.frombuffer(rgba_buffer, dtype=np.uint8).reshape(h_fig, w_fig, 4)
             np.copyto(buf, src)
-            
+
             # Wrap buffer without making a copy
             return Image.frombuffer("RGBA", (w_fig, h_fig), buf, "raw", "RGBA", 0, 1)
 
         futures = {}
         next_submit = 1
         next_yield = 1
-        
+
         def optimize_frame(img, buf):
             p_im = img.convert("RGB").convert("P", dither=Image.Dither.NONE)
             return p_im, buf
@@ -728,7 +836,11 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
             nonlocal next_submit
             if next_submit < len(schedule):
                 # Lease buffer from pool (should always have one available due to active_limit size)
-                buf = buffer_pool.pop() if buffer_pool else np.empty((h_fig, w_fig, 4), dtype=np.uint8)
+                buf = (
+                    buffer_pool.pop()
+                    if buffer_pool
+                    else np.empty((h_fig, w_fig, 4), dtype=np.uint8)
+                )
                 img = draw_frame(next_submit, buf)
                 fut = executor.submit(optimize_frame, img, buf)
                 futures[next_submit] = fut
@@ -737,27 +849,27 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
         buffered_frame = None
         buffered_delay = 0
         total_saved_frames = 1
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Pre-submit initial batch
             for _ in range(active_limit):
                 submit_next()
-                
+
             while next_yield < len(schedule) or buffered_frame is not None:
                 if next_yield < len(schedule):
                     submit_next()
-                    
+
                     fut = futures.pop(next_yield)
                     curr_frame, buf = fut.result()
-                    buffer_pool.append(buf) # return buffer to pool
-                    
+                    buffer_pool.append(buf)  # return buffer to pool
+
                     curr_delay = delays_ms[next_yield]
                     next_yield += 1
-                    
+
                     # Periodic explicit garbage collection
                     if next_yield % 100 == 0:
                         gc.collect()
-                    
+
                     if buffered_frame is None:
                         buffered_frame = curr_frame
                         buffered_delay = curr_delay
@@ -768,22 +880,24 @@ def generate_gif(seed=None, area_scale=1.0, frames=DEFAULT_GIF_FRAMES,
                             buffered_delay += curr_delay
                         else:
                             # Yield the buffered frame with its final accumulated delay
-                            buffered_frame.info['duration'] = buffered_delay
+                            buffered_frame.info["duration"] = buffered_delay
                             total_saved_frames += 1
                             yield buffered_frame
-                            
+
                             # Buffer the new unique frame
                             buffered_frame = curr_frame
                             buffered_delay = curr_delay
                 else:
                     # Final yield at end of stream
                     if buffered_frame is not None:
-                        buffered_frame.info['duration'] = buffered_delay
+                        buffered_frame.info["duration"] = buffered_delay
                         total_saved_frames += 1
                         yield buffered_frame
                         buffered_frame = None
 
-        print(f"Frame deduplication: reduced from {len(schedule)} to {total_saved_frames} frames.")
+        print(
+            f"Frame deduplication: reduced from {len(schedule)} to {total_saved_frames} frames."
+        )
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     suffix = _output_suffix(area_scale, horizontal)
@@ -835,7 +949,13 @@ if __name__ == "__main__":
         i += 1
 
     if gif:
-        generate_gif(seed, area_scale=area_scale, frames=frames, fps=fps,
-                     size=gif_size, horizontal=horizontal)
+        generate_gif(
+            seed,
+            area_scale=area_scale,
+            frames=frames,
+            fps=fps,
+            size=gif_size,
+            horizontal=horizontal,
+        )
     else:
         generate_pattern(seed, area_scale=area_scale, horizontal=horizontal)
