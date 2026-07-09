@@ -566,7 +566,7 @@ function App() {
             ))}
 
             {/* Draw central pupil */}
-            <circle cx={0} cy={0} r={config.pupilR} fill={currentThemeObj.crust} />
+            <circle cx={0} cy={0} r={config.pupilR} style={{ fill: currentThemeObj.crust }} />
             <circle
               cx={0}
               cy={0}
