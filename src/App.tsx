@@ -8,16 +8,30 @@ import {
 import type { PatternConfig, CatppuccinTheme } from "./generator";
 import "./App.css";
 
+interface FavoriteItem {
+  id: string;
+  name: string;
+  seed: number;
+  themeKey: string;
+  sizeKey: string;
+  layout: "desktop" | "iphone-portrait" | "iphone-landscape";
+  manualAccents: boolean;
+  selectedAccents: [string, string];
+}
+
 function App() {
   // Config state
   const [seed, setSeed] = useState<number>(42);
   const [themeKey, setThemeKey] = useState<string>("mocha");
   const [layout, setLayout] = useState<"desktop" | "iphone-portrait" | "iphone-landscape">("desktop");
   const [sizeKey, setSizeKey] = useState<string>("normal");
-  
+
   // Custom accents state
   const [manualAccents, setManualAccents] = useState<boolean>(false);
   const [selectedAccents, setSelectedAccents] = useState<[string, string]>(["sky", "flamingo"]);
+
+  // Favorites state
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
   // Set the current size area scale factor
   const sizeMap: Record<string, number> = {
@@ -48,6 +62,64 @@ function App() {
     });
   }, [themeKey]);
 
+  // Sync active pattern accents with CSS variables dynamically
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--accent-color-1", config.accent1);
+    root.style.setProperty("--accent-color-2", config.accent2);
+  }, [config.accent1, config.accent2]);
+
+  // Load favorites from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("catpattern-favorites");
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load favorites", e);
+      }
+    }
+  }, []);
+
+  const saveFavorites = (items: FavoriteItem[]) => {
+    setFavorites(items);
+    localStorage.setItem("catpattern-favorites", JSON.stringify(items));
+  };
+
+  // Add current design to favorites
+  const handleAddToFavorites = () => {
+    const name = prompt("Enter a name for this design:", `Design ${seed}`);
+    if (name === null) return;
+    const newItem: FavoriteItem = {
+      id: Date.now().toString(),
+      name: name.trim() || `Design ${seed}`,
+      seed,
+      themeKey,
+      sizeKey,
+      layout,
+      manualAccents,
+      selectedAccents,
+    };
+    saveFavorites([...favorites, newItem]);
+  };
+
+  // Delete favorite
+  const handleDeleteFavorite = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const filtered = favorites.filter((item) => item.id !== id);
+    saveFavorites(filtered);
+  };
+
+  // Load favorite configuration
+  const handleLoadFavorite = (item: FavoriteItem) => {
+    setSeed(item.seed);
+    setThemeKey(item.themeKey);
+    setSizeKey(item.sizeKey);
+    setLayout(item.layout);
+    setManualAccents(item.manualAccents);
+    setSelectedAccents(item.selectedAccents);
+  };
+
   // Dimensions for layouts
   const layoutDims = {
     desktop: { w: 3840, h: 2160, label: "Desktop (4K)" },
@@ -66,14 +138,13 @@ function App() {
   // Helper to toggle manual accent selection
   const handleAccentChipClick = (accentName: string) => {
     if (selectedAccents.includes(accentName)) {
-      // Toggle off if already selected (but keep at least 1 selected)
+      // Toggle off index if already selected, keeping selection distinct
       if (selectedAccents[0] === accentName) {
-        // Swap or do nothing if it leaves empty
+        setSelectedAccents([selectedAccents[1], selectedAccents[1] === "sky" ? "flamingo" : "sky"]);
       } else {
-        // Selected is index 1
+        setSelectedAccents([selectedAccents[0], selectedAccents[0] === "sky" ? "flamingo" : "sky"]);
       }
     } else {
-      // Shift out index 0, place new at index 1
       setSelectedAccents([selectedAccents[1], accentName]);
     }
   };
@@ -291,7 +362,7 @@ function App() {
               <span className="slider"></span>
             </label>
           </div>
-          
+
           {manualAccents ? (
             <div className="accents-panel">
               {ACCENTS.map((accent) => {
@@ -336,6 +407,75 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Save to Favorites Button */}
+        <button className="btn" style={{ marginTop: "10px" }} onClick={handleAddToFavorites}>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+          Save to Favorites
+        </button>
+
+        {/* Favorites Gallery section */}
+        {favorites.length > 0 && (
+          <div className="favorites-section">
+            <div className="favorites-header">
+              <span className="favorites-header-title">Saved Gallery</span>
+              <span className="favorites-count">{favorites.length}</span>
+            </div>
+            <div className="favorites-list">
+              {favorites.map((item) => {
+                const favTheme = CATPPUCCIN_THEMES[item.themeKey] || CATPPUCCIN_THEMES.mocha;
+                return (
+                  <div
+                    key={item.id}
+                    className="favorite-item"
+                    onClick={() => handleLoadFavorite(item)}
+                  >
+                    <div className="favorite-item-content">
+                      <span className="favorite-item-title">{item.name}</span>
+                      <div className="favorite-item-meta">
+                        <span>Seed: {item.seed}</span>
+                        <span
+                          className="favorite-badge"
+                          style={{
+                            backgroundColor: favTheme.surface0,
+                            color: favTheme.text,
+                          }}
+                        >
+                          {favTheme.name}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      className="favorite-item-delete"
+                      onClick={(e) => handleDeleteFavorite(item.id, e)}
+                      title="Delete favorite"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Main Workspace (Preview Area) */}
