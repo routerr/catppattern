@@ -415,7 +415,7 @@ export function buildPattern(
       const p2LowRot = rotatePoint(p2Low[0], p2Low[1], angle);
       const p1LowRot = rotatePoint(p1Low[0], p1Low[1], angle);
 
-      const d = `M 0 0 C ${p1Rot[0].toFixed(5)} ${p1Rot[1].toFixed(5)}, ${p2Rot[0].toFixed(5)} ${p2Rot[1].toFixed(5)}, ${p3Rot[0].toFixed(5)} ${p3Rot[1].toFixed(5)} C ${p2LowRot[0].toFixed(5)} ${p2LowRot[1].toFixed(5)}, ${p1LowRot[0].toFixed(5)} ${p1LowRot[1].toFixed(5)}, 0 0`;
+      const d = `M 0 0 C ${p1Rot[0].toFixed(3)} ${p1Rot[1].toFixed(3)}, ${p2Rot[0].toFixed(3)} ${p2Rot[1].toFixed(3)}, ${p3Rot[0].toFixed(3)} ${p3Rot[1].toFixed(3)} C ${p2LowRot[0].toFixed(3)} ${p2LowRot[1].toFixed(3)}, ${p1LowRot[0].toFixed(3)} ${p1LowRot[1].toFixed(3)}, 0 0`;
 
       const tC = 0.5 * (1.0 - Math.cos((2.0 * Math.PI * k) / symN));
       const color = lerpColor(accent1, accent2, tC);

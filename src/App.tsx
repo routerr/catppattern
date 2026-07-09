@@ -69,6 +69,48 @@ function App() {
     root.style.setProperty("--accent-color-2", config.accent2);
   }, [config.accent1, config.accent2]);
 
+  // Sync document page title with the active seed
+  useEffect(() => {
+    document.title = `Catpattern - Seed ${config.seed}`;
+  }, [config.seed]);
+
+  // Sync dynamic square SVG favicon based on current pattern and theme
+  useEffect(() => {
+    const theme = CATPPUCCIN_THEMES[themeKey] || CATPPUCCIN_THEMES.mocha;
+    const size = 64;
+    let svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 1.0 1.0" width="${size}" height="${size}" style="background-color: ${theme.base}; border-radius: 50%;">`;
+    
+    config.families.forEach((fam) => {
+      const scaledLw = fam.lw / 2160.0;
+      fam.petalPaths.forEach((petal) => {
+        svgString += `<path d="${petal.d}" fill="none" stroke="${petal.color}" stroke-width="${scaledLw}" stroke-linecap="round" stroke-linejoin="round" opacity="${fam.alpha}" />`;
+      });
+    });
+    
+    svgString += `<circle cx="0" cy="0" r="${config.pupilR}" fill="${theme.crust}" />`;
+    svgString += `<circle cx="0" cy="0" r="${config.pupilR}" fill="none" stroke="${lerpColor(config.accent1, config.accent2, 0.5)}" stroke-width="${1.1 / 2160.0}" opacity="0.55" />`;
+    svgString += `</svg>`;
+    
+    const blob = new Blob([svgString], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    
+    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.type = "image/svg+xml";
+    const oldUrl = link.href;
+    link.href = url;
+    
+    return () => {
+      if (oldUrl && oldUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(oldUrl);
+      }
+    };
+  }, [config, themeKey]);
+
   // Load favorites from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem("catpattern-favorites");
@@ -149,13 +191,20 @@ function App() {
     }
   };
 
-  // Trigger SVG Download
+  // Trigger SVG Download with minification
   const triggerDownloadSVG = () => {
     const svgEl = document.getElementById("pattern-svg");
     if (!svgEl) return;
 
     const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(svgEl);
+    let svgString = serializer.serializeToString(svgEl);
+
+    // Minify SVG string: remove redundant spaces, trim precision, strip inter-tag spacing
+    svgString = svgString
+      .replace(/>\s+</g, "><") // remove whitespace between tags
+      .replace(/\s+/g, " ") // normalize whitespace
+      .trim();
+
     const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
 
