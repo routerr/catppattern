@@ -20,10 +20,43 @@ interface FavoriteItem {
   selectedAccents: [string, string];
 }
 
+const getInitialLanguage = (): "en" | "zh" => {
+  // 1. Check URL parameters
+  const params = new URLSearchParams(window.location.search);
+  const urlLang = params.get("lang");
+  if (urlLang === "zh" || urlLang === "en") {
+    return urlLang;
+  }
+
+  // 2. Check localStorage
+  const savedLang = localStorage.getItem("catpattern-lang");
+  if (savedLang === "zh" || savedLang === "en") {
+    return savedLang;
+  }
+
+  // 3. Fallback to browser language
+  const browserLang = navigator.language || "";
+  if (browserLang.toLowerCase().startsWith("zh")) {
+    return "zh";
+  }
+
+  return "en";
+};
+
 function App() {
   // Localization state
-  const [lang, setLang] = useState<"en" | "zh">("en");
+  const [lang, setLang] = useState<"en" | "zh">(getInitialLanguage);
   const t = LOCALES[lang];
+
+  const handleSetLang = (newLang: "en" | "zh") => {
+    setLang(newLang);
+    localStorage.setItem("catpattern-lang", newLang);
+
+    // Update URL query parameters without reloading the page
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", newLang);
+    window.history.pushState({}, "", url.toString());
+  };
 
   // Config state
   const [seed, setSeed] = useState<number>(42);
@@ -287,7 +320,7 @@ function App() {
           <button
             className="btn btn-secondary"
             style={{ padding: "4px 8px", fontSize: "12px", minWidth: "50px" }}
-            onClick={() => setLang(lang === "en" ? "zh" : "en")}
+            onClick={() => handleSetLang(lang === "en" ? "zh" : "en")}
           >
             {lang === "en" ? "繁中" : "EN"}
           </button>
