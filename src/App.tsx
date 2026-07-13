@@ -6,6 +6,7 @@ import {
   lerpColor,
 } from "./generator";
 import type { PatternConfig, CatppuccinTheme } from "./generator";
+import { LOCALES } from "./locales";
 import "./App.css";
 
 interface FavoriteItem {
@@ -20,6 +21,10 @@ interface FavoriteItem {
 }
 
 function App() {
+  // Localization state
+  const [lang, setLang] = useState<"en" | "zh">("en");
+  const t = LOCALES[lang];
+
   // Config state
   const [seed, setSeed] = useState<number>(42);
   const [themeKey, setThemeKey] = useState<string>("mocha");
@@ -130,11 +135,11 @@ function App() {
 
   // Add current design to favorites
   const handleAddToFavorites = () => {
-    const name = prompt("Enter a name for this design:", `Design ${seed}`);
+    const name = prompt(t.designNamePrompt, `${t.defaultDesignName} ${seed}`);
     if (name === null) return;
     const newItem: FavoriteItem = {
       id: Date.now().toString(),
-      name: name.trim() || `Design ${seed}`,
+      name: name.trim() || `${t.defaultDesignName} ${seed}`,
       seed,
       themeKey,
       sizeKey,
@@ -265,24 +270,33 @@ function App() {
     <div className="app-container">
       {/* Control Sidebar */}
       <aside className="sidebar">
-        <div className="brand">
-          <svg
-            className="brand-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+        <div className="brand" style={{ justifyContent: "space-between", width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <svg
+              className="brand-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="8" />
+              <path d="M12 2v20M2 12h20M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" />
+            </svg>
+            <h1 className="brand-title">{t.brandTitle}</h1>
+          </div>
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "4px 8px", fontSize: "12px", minWidth: "50px" }}
+            onClick={() => setLang(lang === "en" ? "zh" : "en")}
           >
-            <circle cx="12" cy="12" r="8" />
-            <path d="M12 2v20M2 12h20M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" />
-          </svg>
-          <h1 className="brand-title">Catpattern</h1>
+            {lang === "en" ? "繁中" : "EN"}
+          </button>
         </div>
-        <p className="brand-subtitle">Procedural Catppuccin Mandala Generator</p>
+        <p className="brand-subtitle">{t.brandSubtitle}</p>
 
         {/* Seed Input */}
         <div className="input-group">
-          <label className="input-label">Seed</label>
+          <label className="input-label">{t.seed}</label>
           <div className="input-row">
             <input
               type="number"
@@ -292,14 +306,14 @@ function App() {
               max="2147483647"
             />
             <button className="btn btn-secondary" onClick={randomizeSeed}>
-              Randomize
+              {t.randomize}
             </button>
           </div>
         </div>
 
         {/* Theme Selection */}
         <div className="input-group">
-          <label className="input-label">Palettes (Themes)</label>
+          <label className="input-label">{t.palettes}</label>
           <div className="theme-selector">
             {Object.entries(CATPPUCCIN_THEMES).map(([key, t]) => (
               <div
@@ -321,19 +335,19 @@ function App() {
 
         {/* Size Selection */}
         <div className="input-group">
-          <label className="input-label">Pattern Size Scale</label>
+          <label className="input-label">{t.sizeScale}</label>
           <select value={sizeKey} onChange={(e) => setSizeKey(e.target.value)}>
-            <option value="normal">Normal (100% Area)</option>
-            <option value="small">Small (50% Area)</option>
-            <option value="extra-small">Extra Small (25% Area)</option>
-            <option value="micro">Micro (10% Area)</option>
-            <option value="nano">Nano (5% Area)</option>
+            <option value="normal">{t.normal}</option>
+            <option value="small">{t.small}</option>
+            <option value="extra-small">{t.extraSmall}</option>
+            <option value="micro">{t.micro}</option>
+            <option value="nano">{t.nano}</option>
           </select>
         </div>
 
         {/* Layout Selection */}
         <div className="input-group">
-          <label className="input-label">Aspect Ratio & Layout</label>
+          <label className="input-label">{t.aspectRatio}</label>
           <div className="layout-selector">
             <div
               className={`layout-card ${layout === "desktop" ? "active" : ""}`}
@@ -350,8 +364,8 @@ function App() {
                 <path d="M8 21h8M12 17v4" />
               </svg>
               <div className="layout-card-info">
-                <span className="layout-card-name">Desktop Wallpaper</span>
-                <span className="layout-card-res">4K Landscape (3840 × 2160)</span>
+                <span className="layout-card-name">{t.desktop}</span>
+                <span className="layout-card-res">{t.desktopRes}</span>
               </div>
             </div>
 
@@ -370,8 +384,8 @@ function App() {
                 <path d="M12 18h.01" />
               </svg>
               <div className="layout-card-info">
-                <span className="layout-card-name">iPhone Lockscreen</span>
-                <span className="layout-card-res">Portrait (1170 × 2532)</span>
+                <span className="layout-card-name">{t.iphonePortrait}</span>
+                <span className="layout-card-res">{t.iphonePortraitRes}</span>
               </div>
             </div>
 
@@ -391,8 +405,8 @@ function App() {
                 <path d="M12 18h.01" />
               </svg>
               <div className="layout-card-info">
-                <span className="layout-card-name">iPhone Landscape</span>
-                <span className="layout-card-res">Landscape (2532 × 1170)</span>
+                <span className="layout-card-name">{t.iphoneLandscape}</span>
+                <span className="layout-card-res">{t.iphoneLandscapeRes}</span>
               </div>
             </div>
           </div>
@@ -401,7 +415,7 @@ function App() {
         {/* Accents Selector Toggle */}
         <div className="input-group">
           <div className="manual-toggle">
-            <span className="input-label" style={{ margin: 0 }}>Custom Accents</span>
+            <span className="input-label" style={{ margin: 0 }}>{t.customAccents}</span>
             <label className="switch">
               <input
                 type="checkbox"
@@ -433,7 +447,7 @@ function App() {
             </div>
           ) : (
             <div className="accent-title-box">
-              <span>Auto Selected:</span>
+              <span>{t.autoSelected}:</span>
               <span
                 className="accent-badge"
                 style={{
@@ -469,14 +483,14 @@ function App() {
           >
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
-          Save to Favorites
+          {t.saveToFavorites}
         </button>
 
         {/* Favorites Gallery section */}
         {favorites.length > 0 && (
           <div className="favorites-section">
             <div className="favorites-header">
-              <span className="favorites-header-title">Saved Gallery</span>
+              <span className="favorites-header-title">{t.savedGallery}</span>
               <span className="favorites-count">{favorites.length}</span>
             </div>
             <div className="favorites-list">
@@ -491,7 +505,7 @@ function App() {
                     <div className="favorite-item-content">
                       <span className="favorite-item-title">{item.name}</span>
                       <div className="favorite-item-meta">
-                        <span>Seed: {item.seed}</span>
+                        <span>{t.seed}: {item.seed}</span>
                         <span
                           className="favorite-badge"
                           style={{
@@ -593,7 +607,7 @@ function App() {
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
             </svg>
-            Download SVG
+            {t.downloadSvg}
           </button>
           <button className="btn" onClick={triggerDownloadPNG}>
             <svg
@@ -606,7 +620,7 @@ function App() {
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
             </svg>
-            Download PNG (4K)
+            {t.downloadPng}
           </button>
         </div>
       </main>
